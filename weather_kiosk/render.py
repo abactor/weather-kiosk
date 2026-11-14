@@ -87,6 +87,10 @@ h1 {
 .reminder {
   color: #ffffff;
 }
+.alert.beside-route,
+.reminder.beside-route {
+  margin-right: 260px;
+}
 html.power-dim::before,
 html.power-off::before {
   content: "";
@@ -389,7 +393,7 @@ def render_page(day: date, slots: Sequence, alerts: Sequence = (), reminder: str
         '<p class="day">'
         + html.escape(format_window(day, slots))
         + "</p>\n"
-        + _alert_html(alerts, reminder)
+        + _alert_html(alerts, reminder, len(boards) >= 3)
         + _buses_html(boards)
         + _FIT_SCRIPT
         + _POWER_SCRIPT
@@ -430,24 +434,26 @@ def _route_html(board) -> str:
     return '<span class="route">%s</span>' % "".join(shown)
 
 
-def _alert_html(alerts: Sequence, reminder: str = "") -> str:
+def _alert_html(alerts: Sequence, reminder: str = "", beside_route: bool = False) -> str:
     """One line under the date.
 
     An alert is red and scrolls when it is long. With no alert, the same
-    line stays reserved in white for a daily reminder.
+    line stays reserved in white for a daily reminder. A third bus route
+    sits on this line, so the line stops short of that route.
     """
     line = alert_line(alerts)
     if line:
-        return _banner("alert", line)
-    return _banner("reminder", " ".join(str(reminder).split()))
+        return _banner("alert", line, beside_route)
+    return _banner("reminder", " ".join(str(reminder).split()), beside_route)
 
 
-def _banner(kind: str, line: str) -> str:
+def _banner(kind: str, line: str, beside_route: bool = False) -> str:
+    classes = kind + (" beside-route" if beside_route else "")
     if not line:
-        return '<p class="%s"></p>\n' % kind
+        return '<p class="%s"></p>\n' % classes
     return (
         '<p class="%s"><span class="alert-text"><span class="alert-chunk">%s</span></span></p>\n'
-        % (kind, html.escape(line))
+        % (classes, html.escape(line))
     )
 
 
