@@ -193,22 +193,37 @@ def board_routes(
         for stop_id, when in stops:
             if stop_id == config.stop_id and when > cutoff:
                 for route in matched:
-                    by_route[route].append(when)
+                    by_route[route].append((when, feed_id))
     boards = []
     for route_id in config.routes:
         if known is not None and not any(route_matches(route_id, item) for item in known):
             boards.append(RouteBoard(route_id, (), "not_at_stop"))
             continue
-        chosen = tuple(sorted(set(by_route[route_id]))[:2])
+        chosen = _next_two(by_route[route_id])
         if not chosen:
             boards.append(RouteBoard(route_id, (), "no_bus"))
             continue
         moments = tuple(
             datetime.fromtimestamp(when, timezone.utc).astimezone(TORONTO)
-            for when in chosen
+            for when, _feed_id in chosen
         )
-        boards.append(RouteBoard(route_id, moments, "times"))
+        boards.append(RouteBoard(chosen[0][1], moments, "times"))
     return boards
+
+
+
+def _next_two(pairs):
+    """Earliest two distinct times, each tagged with the feed id that produced it."""
+    chosen = []
+    seen = set()
+    for when, feed_id in sorted(pairs):
+        if when in seen:
+            continue
+        seen.add(when)
+        chosen.append((when, feed_id))
+        if len(chosen) == 2:
+            break
+    return chosen
 
 
 def format_arrival(moment: datetime) -> str:

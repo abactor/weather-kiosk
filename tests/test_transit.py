@@ -124,6 +124,41 @@ def test_route_match_is_exact_or_one_letter_for_any_number():
         assert route_matches(configured, feed_id) is expected
 
 
+def test_badge_shows_the_feed_id_of_the_soonest_trip():
+    now = datetime(2026, 11, 14, 9, 0, tzinfo=TORONTO)
+    soon = int((now + timedelta(minutes=8)).timestamp())
+    follow = int((now + timedelta(minutes=21)).timestamp())
+    between = int((now + timedelta(minutes=12)).timestamp())
+    config = parse_config("stop 100\nroute 11\n")
+    serving = {"11", "11A", "11B", "111"}
+
+    variant = board_routes(
+        config,
+        [("11A", [("100", soon)]), ("11", [("100", follow)]), ("111", [("100", between)])],
+        now,
+        serving=serving,
+    )
+    assert variant[0].route_id == "11A"
+    assert [format_arrival(item) for item in variant[0].arrivals] == ["9:08 am", "9:21 am"]
+    page = render_page(now.date(), [], [], "", variant)
+    assert 'class="badge">11A<' in page
+    assert 'class="later">9:21 am<' in page
+    assert "111" not in page
+
+    base = board_routes(
+        config,
+        [("11", [("100", soon)]), ("11A", [("100", follow)]), ("111", [("100", between)])],
+        now,
+        serving=serving,
+    )
+    assert base[0].route_id == "11"
+    base_page = render_page(now.date(), [], [], "", base)
+    assert 'class="badge">11<' in base_page
+    assert 'class="badge">11A<' not in base_page
+    assert 'class="later">9:21 am<' in base_page
+    assert "111" not in base_page
+
+
 def test_letter_suffix_arrivals_collect_under_the_configured_number():
     now = datetime(2026, 11, 14, 9, 0, tzinfo=TORONTO)
     first = int((now + timedelta(minutes=8)).timestamp())
@@ -143,7 +178,7 @@ def test_letter_suffix_arrivals_collect_under_the_configured_number():
         now,
         serving={"11A", "11B", "111", "28", "281"},
     )
-    assert [item.route_id for item in board] == ["11", "28"]
+    assert [item.route_id for item in board] == ["11A", "28"]
     assert [format_arrival(item) for item in board[0].arrivals] == ["9:08 am", "9:21 am"]
     assert [format_arrival(item) for item in board[1].arrivals] == ["9:08 am"]
 
