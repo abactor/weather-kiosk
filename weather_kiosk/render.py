@@ -238,12 +238,15 @@ html.power-off::before {
   padding: 0 4px;
   box-sizing: border-box;
   text-align: center;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 22px;
   color: #121820;
   background: #ff5a36;
   border-radius: 4px;
+}
+.badge.long {
+  font-size: 17px;
 }
 .next {
   font-size: 20px;
@@ -420,7 +423,9 @@ def _buses_html(boards: Sequence) -> str:
 
 
 def _route_html(board) -> str:
-    badge = '<span class="badge">%s</span>' % html.escape(str(board.route_id))
+    label = str(board.route_id)
+    klass = "badge" if len(label) <= 2 else "badge long"
+    badge = '<span class="%s">%s</span>' % (klass, html.escape(label))
     if board.state == "times" and board.arrivals:
         shown = [badge, '<span class="next">%s</span>' % html.escape(format_arrival(board.arrivals[0]))]
         second = ""

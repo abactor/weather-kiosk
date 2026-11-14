@@ -92,6 +92,7 @@ def parse_config(text: str) -> Optional[TransitConfig]:
 
     Comments and blanks are ignored. A route before the first stop is skipped.
     The same stop later in the file adds routes to the earlier group.
+    A route value may be one id or a comma-separated list.
     """
     groups = []
     current = None
@@ -99,12 +100,14 @@ def parse_config(text: str) -> Optional[TransitConfig]:
         raw = line.split("#", 1)[0].strip()
         if not raw:
             continue
-        parts = raw.split()
+        parts = raw.split(None, 1)
         if len(parts) != 2:
             continue
         key = parts[0].lower()
-        value = parts[1]
+        value = parts[1].strip()
         if key == "stop":
+            if any(ch.isspace() for ch in value):
+                continue
             current = None
             for group in groups:
                 if group[0] == value:
@@ -113,8 +116,11 @@ def parse_config(text: str) -> Optional[TransitConfig]:
             if current is None:
                 current = [value, []]
                 groups.append(current)
-        elif key == "route" and current is not None and value not in current[1]:
-            current[1].append(value)
+        elif key == "route" and current is not None:
+            for token in value.split(","):
+                route = token.strip().upper()
+                if route and not any(ch.isspace() for ch in route) and route not in current[1]:
+                    current[1].append(route)
     stops = tuple((stop_id, tuple(routes)) for stop_id, routes in groups if routes)
     if not stops:
         return None
@@ -157,6 +163,22 @@ def parse_trip_updates(payload: bytes) -> List[Tuple[str, List[Tuple[str, int]]]
     return found
 
 
+def route_matches(configured: str, feed_id: str) -> bool:
+    """True for the same id. A bare number also matches one trailing A-Z letter.
+
+    11 matches 11, 11A, 11B, and 11C. It does not match 111 or 11AB.
+    11A matches 11A only. It does not match 11, 11B, or 11AA.
+    """
+    if feed_id == configured:
+        return True
+    if not configured.isdigit():
+        return False
+    if len(feed_id) != len(configured) + 1 or not feed_id.startswith(configured):
+        return False
+    suffix = feed_id[-1]
+    return "A" <= suffix <= "Z"
+
+
 def board_routes(
     config: TransitConfig,
     updates: Sequence[Tuple[str, Sequence[Tuple[str, int]]]],
@@ -167,32 +189,49 @@ def board_routes(
 
     `serving` is the set of route ids known to call at this stop. Without it,
     a route with no future time is "no_bus" rather than "not_at_stop".
+    A configured number also accepts that number plus one trailing letter.
     """
     known = None if serving is None else set(serving)
     cutoff = int(now.timestamp())
     by_route = {route: [] for route in config.routes}
-    for route_id, stops in updates:
-        bucket = by_route.get(route_id)
-        if bucket is None:
+    for feed_id, stops in updates:
+        matched = [route for route in config.routes if route_matches(route, feed_id)]
+        if not matched:
             continue
         for stop_id, when in stops:
             if stop_id == config.stop_id and when > cutoff:
-                bucket.append(when)
+                for route in matched:
+                    by_route[route].append((when, feed_id))
     boards = []
     for route_id in config.routes:
-        if known is not None and route_id not in known:
+        if known is not None and not any(route_matches(route_id, item) for item in known):
             boards.append(RouteBoard(route_id, (), "not_at_stop"))
             continue
-        chosen = tuple(sorted(set(by_route[route_id]))[:2])
+        chosen = _next_two(by_route[route_id])
         if not chosen:
             boards.append(RouteBoard(route_id, (), "no_bus"))
             continue
         moments = tuple(
             datetime.fromtimestamp(when, timezone.utc).astimezone(TORONTO)
-            for when in chosen
+            for when, _feed_id in chosen
         )
-        boards.append(RouteBoard(route_id, moments, "times"))
+        boards.append(RouteBoard(chosen[0][1], moments, "times"))
     return boards
+
+
+
+def _next_two(pairs):
+    """Earliest two distinct times, each tagged with the feed id that produced it."""
+    chosen = []
+    seen = set()
+    for when, feed_id in sorted(pairs):
+        if when in seen:
+            continue
+        seen.add(when)
+        chosen.append((when, feed_id))
+        if len(chosen) == 2:
+            break
+    return chosen
 
 
 def format_arrival(moment: datetime) -> str:

@@ -1,7 +1,19 @@
+# Stop code: the public number on the TTC stop sign, for example 1874.
+# Route number: the standard TTC route number, for example 28 or 11.
+# Look them up at https://www.ttc.ca/routes-and-schedules
+#
 # stop <code>
-# route <number>
+# route <id>
 # A route belongs to the stop above it.
+#
+# A bare number includes that number and one trailing letter.
+# Use it when you want every branch. 11 also matches 11A, 11B, and 11C.
+# It does not match 111 or 11AB. Lower case is fine in this file: 11a is 11A.
+#
+# List the ids when you want only some branches. Commas or separate
+# lines are the same. Each listed id is exact.
+# 11A, 11B matches 11A and 11B only. It does not match 11 or 11C.
 #
 # stop 0000
 # route 00
-# route 00
+# route 00A, 00B

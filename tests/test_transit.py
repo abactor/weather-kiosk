@@ -14,6 +14,7 @@ from weather_kiosk.render import render_page
 from weather_kiosk.transit import (
     SURFACE_GTFS_URL,
     RouteBoard,
+    route_matches,
     TransitConfig,
     TransitError,
     board_routes,
@@ -97,6 +98,146 @@ route 501
     assert config.routes == ("52", "97", "501")
     assert parse_config("route 52\n") is None
     assert parse_config("") is None
+
+
+def test_route_match_is_exact_or_one_letter_for_any_number():
+    samples = (
+        ("11", "11", True),
+        ("11", "11A", True),
+        ("11", "11B", True),
+        ("11", "11C", True),
+        ("11", "111", False),
+        ("11", "11AB", False),
+        ("11", "11a", False),
+        ("28", "28", True),
+        ("28", "28A", True),
+        ("28", "281", False),
+        ("28", "128", False),
+        ("501", "501", True),
+        ("501", "501C", True),
+        ("501", "5011", False),
+        ("7", "7B", True),
+        ("7", "70", False),
+        ("7", "71", False),
+        ("11A", "11A", True),
+        ("11A", "11", False),
+        ("11A", "11B", False),
+        ("11A", "11C", False),
+        ("11A", "11AA", False),
+        ("501C", "501C", True),
+        ("501C", "501", False),
+        ("501C", "501A", False),
+        ("501C", "501CA", False),
+    )
+    for configured, feed_id, expected in samples:
+        assert route_matches(configured, feed_id) is expected
+
+
+def test_badge_shows_the_feed_id_of_the_soonest_trip():
+    now = datetime(2026, 11, 14, 9, 0, tzinfo=TORONTO)
+    soon = int((now + timedelta(minutes=8)).timestamp())
+    follow = int((now + timedelta(minutes=21)).timestamp())
+    between = int((now + timedelta(minutes=12)).timestamp())
+    config = parse_config("stop 100\nroute 11\n")
+    serving = {"11", "11A", "11B", "111"}
+
+    variant = board_routes(
+        config,
+        [("11A", [("100", soon)]), ("11", [("100", follow)]), ("111", [("100", between)])],
+        now,
+        serving=serving,
+    )
+    assert variant[0].route_id == "11A"
+    assert [format_arrival(item) for item in variant[0].arrivals] == ["9:08 am", "9:21 am"]
+    page = render_page(now.date(), [], [], "", variant)
+    assert 'class="badge long">11A<' in page
+    assert 'class="badge">11<' not in page
+    assert ".badge {\n  min-width: 40px;" in page
+    assert "font-size: 18px;\n  font-weight: 700;\n  line-height: 22px;\n  color: #121820;\n  background: #ff5a36;" in page
+    assert ".badge.long {\n  font-size: 17px;\n}" in page
+    assert 'class="later">9:21 am<' in page
+    assert "111" not in page
+
+    base = board_routes(
+        config,
+        [("11", [("100", soon)]), ("11A", [("100", follow)]), ("111", [("100", between)])],
+        now,
+        serving=serving,
+    )
+    assert base[0].route_id == "11"
+    base_page = render_page(now.date(), [], [], "", base)
+    assert 'class="badge">11<' in base_page
+    assert 'class="badge long">' not in base_page
+    assert 'class="badge">11A<' not in base_page
+    assert 'class="later">9:21 am<' in base_page
+    assert "111" not in base_page
+
+
+
+def test_lower_case_route_ids_match_upper_case_feed_ids():
+    config = parse_config("stop 100\nroute 11a, 28b\nroute 11A\n")
+    assert config is not None
+    assert config.routes == ("11A", "28B")
+    now = datetime(2026, 11, 14, 9, 0, tzinfo=TORONTO)
+    soon = int((now + timedelta(minutes=8)).timestamp())
+    board = board_routes(
+        config,
+        [("11A", [("100", soon)]), ("28B", [("100", soon)])],
+        now,
+        serving={"11A", "28B"},
+    )
+    assert [item.route_id for item in board] == ["11A", "28B"]
+    assert [format_arrival(item) for item in board[0].arrivals] == ["9:08 am"]
+    assert [format_arrival(item) for item in board[1].arrivals] == ["9:08 am"]
+
+
+def test_comma_list_keeps_only_the_named_variants():
+    config = parse_config("stop 100\nroute 11A, 11B\nroute 11A,11C\n")
+    assert config is not None
+    assert config.routes == ("11A", "11B", "11C")
+    now = datetime(2026, 11, 14, 9, 0, tzinfo=TORONTO)
+    soon = int((now + timedelta(minutes=8)).timestamp())
+    later = int((now + timedelta(minutes=20)).timestamp())
+    board = board_routes(
+        config,
+        [
+            ("11A", [("100", soon)]),
+            ("11B", [("100", later)]),
+            ("11", [("100", soon)]),
+            ("11C", [("100", soon)]),
+            ("111", [("100", later)]),
+        ],
+        now,
+        serving={"11", "11A", "11B", "11C", "111"},
+    )
+    assert [item.route_id for item in board] == ["11A", "11B", "11C"]
+    assert [format_arrival(item) for item in board[0].arrivals] == ["9:08 am"]
+    assert [format_arrival(item) for item in board[1].arrivals] == ["9:20 am"]
+    assert [format_arrival(item) for item in board[2].arrivals] == ["9:08 am"]
+
+
+def test_letter_suffix_arrivals_collect_under_the_configured_number():
+    now = datetime(2026, 11, 14, 9, 0, tzinfo=TORONTO)
+    first = int((now + timedelta(minutes=8)).timestamp())
+    second = int((now + timedelta(minutes=21)).timestamp())
+    later = int((now + timedelta(minutes=30)).timestamp())
+    updates = [
+        ("11A", [("100", first)]),
+        ("11B", [("100", second)]),
+        ("111", [("100", later)]),
+        ("28", [("100", first)]),
+        ("281", [("100", later)]),
+    ]
+    config = parse_config("stop 100\nroute 11\nroute 28\n")
+    board = board_routes(
+        config,
+        updates,
+        now,
+        serving={"11A", "11B", "111", "28", "281"},
+    )
+    assert [item.route_id for item in board] == ["11A", "28"]
+    assert [format_arrival(item) for item in board[0].arrivals] == ["9:08 am", "9:21 am"]
+    assert [format_arrival(item) for item in board[1].arrivals] == ["9:08 am"]
 
 
 def test_board_keeps_the_next_two_future_arrivals():
@@ -269,6 +410,8 @@ def test_panel_draws_the_board_and_omits_an_empty_corner():
     page = render_page(datetime(2026, 11, 14, tzinfo=TORONTO).date(), [], [], "", board)
     assert 'class="buses"' in page
     assert 'class="badge">28<' in page
+    assert 'class="badge">11<' in page
+    assert 'class="badge long">501<' in page
     assert 'class="next">9:08 am<' in page
     assert 'class="later">9:21 am<' in page
     assert 'class="note">no bus<' in page
