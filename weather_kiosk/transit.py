@@ -92,6 +92,7 @@ def parse_config(text: str) -> Optional[TransitConfig]:
 
     Comments and blanks are ignored. A route before the first stop is skipped.
     The same stop later in the file adds routes to the earlier group.
+    A route value may be one id or a comma-separated list.
     """
     groups = []
     current = None
@@ -99,12 +100,14 @@ def parse_config(text: str) -> Optional[TransitConfig]:
         raw = line.split("#", 1)[0].strip()
         if not raw:
             continue
-        parts = raw.split()
+        parts = raw.split(None, 1)
         if len(parts) != 2:
             continue
         key = parts[0].lower()
-        value = parts[1]
+        value = parts[1].strip()
         if key == "stop":
+            if any(ch.isspace() for ch in value):
+                continue
             current = None
             for group in groups:
                 if group[0] == value:
@@ -113,8 +116,11 @@ def parse_config(text: str) -> Optional[TransitConfig]:
             if current is None:
                 current = [value, []]
                 groups.append(current)
-        elif key == "route" and current is not None and value not in current[1]:
-            current[1].append(value)
+        elif key == "route" and current is not None:
+            for token in value.split(","):
+                route = token.strip()
+                if route and not any(ch.isspace() for ch in route) and route not in current[1]:
+                    current[1].append(route)
     stops = tuple((stop_id, tuple(routes)) for stop_id, routes in groups if routes)
     if not stops:
         return None
@@ -158,13 +164,15 @@ def parse_trip_updates(payload: bytes) -> List[Tuple[str, List[Tuple[str, int]]]
 
 
 def route_matches(configured: str, feed_id: str) -> bool:
-    """True for the same id, or that id plus one trailing A-Z letter.
+    """True for the same id. A bare number also matches one trailing A-Z letter.
 
-    11 matches 11, 11A, and 11B. It does not match 111 or 11AB.
-    The same rule applies to every configured number.
+    11 matches 11, 11A, 11B, and 11C. It does not match 111 or 11AB.
+    11A matches 11A only. It does not match 11, 11B, or 11AA.
     """
     if feed_id == configured:
         return True
+    if not configured.isdigit():
+        return False
     if len(feed_id) != len(configured) + 1 or not feed_id.startswith(configured):
         return False
     suffix = feed_id[-1]

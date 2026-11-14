@@ -119,6 +119,15 @@ def test_route_match_is_exact_or_one_letter_for_any_number():
         ("7", "7B", True),
         ("7", "70", False),
         ("7", "71", False),
+        ("11A", "11A", True),
+        ("11A", "11", False),
+        ("11A", "11B", False),
+        ("11A", "11C", False),
+        ("11A", "11AA", False),
+        ("501C", "501C", True),
+        ("501C", "501", False),
+        ("501C", "501A", False),
+        ("501C", "501CA", False),
     )
     for configured, feed_id, expected in samples:
         assert route_matches(configured, feed_id) is expected
@@ -157,6 +166,32 @@ def test_badge_shows_the_feed_id_of_the_soonest_trip():
     assert 'class="badge">11A<' not in base_page
     assert 'class="later">9:21 am<' in base_page
     assert "111" not in base_page
+
+
+
+def test_comma_list_keeps_only_the_named_variants():
+    config = parse_config("stop 100\nroute 11A, 11B\nroute 11A,11C\n")
+    assert config is not None
+    assert config.routes == ("11A", "11B", "11C")
+    now = datetime(2026, 11, 14, 9, 0, tzinfo=TORONTO)
+    soon = int((now + timedelta(minutes=8)).timestamp())
+    later = int((now + timedelta(minutes=20)).timestamp())
+    board = board_routes(
+        config,
+        [
+            ("11A", [("100", soon)]),
+            ("11B", [("100", later)]),
+            ("11", [("100", soon)]),
+            ("11C", [("100", soon)]),
+            ("111", [("100", later)]),
+        ],
+        now,
+        serving={"11", "11A", "11B", "11C", "111"},
+    )
+    assert [item.route_id for item in board] == ["11A", "11B", "11C"]
+    assert [format_arrival(item) for item in board[0].arrivals] == ["9:08 am"]
+    assert [format_arrival(item) for item in board[1].arrivals] == ["9:20 am"]
+    assert [format_arrival(item) for item in board[2].arrivals] == ["9:08 am"]
 
 
 def test_letter_suffix_arrivals_collect_under_the_configured_number():
