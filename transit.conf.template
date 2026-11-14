@@ -1,0 +1,7 @@
+# stop <code>
+# route <number>
+# A route belongs to the stop above it.
+#
+# stop 0000
+# route 00
+# route 00

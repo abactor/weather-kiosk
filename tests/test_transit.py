@@ -301,6 +301,21 @@ def test_a_single_arrival_keeps_the_second_time_column():
     assert "grid-template-columns: 40px 90px 72px" in page
 
 
+def test_third_route_shortens_the_reminder_so_it_does_not_run_under_that_row():
+    boards = tuple(RouteBoard(str(route), (), "no_bus") for route in (28, 11, 74))
+    day = datetime(2026, 11, 14, tzinfo=TORONTO).date()
+    reminder = "Sat 11:00 am: dentist"
+    page = render_page(day, [], [], reminder, boards)
+    assert 'class="reminder beside-route"' in page
+    assert "margin-right: 260px" in page
+    two = render_page(day, [], [], reminder, boards[:2])
+    assert 'class="reminder beside-route"' not in two
+    from weather_kiosk.alerts import WeatherAlert
+    alert = WeatherAlert("warning", "Rainfall warning", "Heavy rain.", "City of Toronto")
+    alert_page = render_page(day, [], [alert], reminder, boards)
+    assert 'class="alert beside-route"' in alert_page
+
+
 def test_routes_stack_one_per_line_and_overflow_fills_the_top_line():
     boards = tuple(RouteBoard(str(route), (), "no_bus") for route in (28, 11, 74, 75, 76))
     page = render_page(datetime(2026, 11, 14, tzinfo=TORONTO).date(), [], [], "", boards)
