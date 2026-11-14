@@ -9,6 +9,12 @@ Copy `calendar.url.template` to `~/.config/weather-kiosk/calendar.url` and `tran
 - `calendar.url`, mode 600. One iCal URL, or `WEATHER_KIOSK_CALENDAR_URL`. If both are missing, the reminder line stays blank.
 - `transit.conf`. Lines of `stop <code>` and `route <number>`. A route belongs to the stop above it. `#` starts a comment. If the file is missing, the panel shows no buses.
 
+Finding stop and route numbers:
+
+- The stop code is the public number printed on the TTC stop sign, for example `1874`. The app maps it to the feed's internal stop id, so use the sign number, not the internal id.
+- Route numbers are the standard TTC route numbers, for example `28` or `11`.
+- Look them up on the TTC website: https://www.ttc.ca/routes-and-schedules. Search by route, stop, or station. A stop page's address ends in the stop code, for example https://www.ttc.ca/routes-and-schedules/11/0/1874 for stop `1874`.
+
 The app writes the rest of that folder.
 
 - `reminder.json`

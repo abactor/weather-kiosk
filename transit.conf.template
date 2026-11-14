@@ -1,3 +1,7 @@
+# Stop code: the public number on the TTC stop sign, for example 1874.
+# Route number: the standard TTC route number, for example 28 or 11.
+# Look them up at https://www.ttc.ca/routes-and-schedules
+#
 # stop <code>
 # route <number>
 # A route belongs to the stop above it.

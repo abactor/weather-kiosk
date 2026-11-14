@@ -157,6 +157,20 @@ def parse_trip_updates(payload: bytes) -> List[Tuple[str, List[Tuple[str, int]]]
     return found
 
 
+def route_matches(configured: str, feed_id: str) -> bool:
+    """True for the same id, or that id plus one trailing A-Z letter.
+
+    11 matches 11, 11A, and 11B. It does not match 111 or 11AB.
+    The same rule applies to every configured number.
+    """
+    if feed_id == configured:
+        return True
+    if len(feed_id) != len(configured) + 1 or not feed_id.startswith(configured):
+        return False
+    suffix = feed_id[-1]
+    return "A" <= suffix <= "Z"
+
+
 def board_routes(
     config: TransitConfig,
     updates: Sequence[Tuple[str, Sequence[Tuple[str, int]]]],
@@ -167,20 +181,22 @@ def board_routes(
 
     `serving` is the set of route ids known to call at this stop. Without it,
     a route with no future time is "no_bus" rather than "not_at_stop".
+    A configured number also accepts that number plus one trailing letter.
     """
     known = None if serving is None else set(serving)
     cutoff = int(now.timestamp())
     by_route = {route: [] for route in config.routes}
-    for route_id, stops in updates:
-        bucket = by_route.get(route_id)
-        if bucket is None:
+    for feed_id, stops in updates:
+        matched = [route for route in config.routes if route_matches(route, feed_id)]
+        if not matched:
             continue
         for stop_id, when in stops:
             if stop_id == config.stop_id and when > cutoff:
-                bucket.append(when)
+                for route in matched:
+                    by_route[route].append(when)
     boards = []
     for route_id in config.routes:
-        if known is not None and route_id not in known:
+        if known is not None and not any(route_matches(route_id, item) for item in known):
             boards.append(RouteBoard(route_id, (), "not_at_stop"))
             continue
         chosen = tuple(sorted(set(by_route[route_id]))[:2])

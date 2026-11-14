@@ -14,6 +14,7 @@ from weather_kiosk.render import render_page
 from weather_kiosk.transit import (
     SURFACE_GTFS_URL,
     RouteBoard,
+    route_matches,
     TransitConfig,
     TransitError,
     board_routes,
@@ -97,6 +98,54 @@ route 501
     assert config.routes == ("52", "97", "501")
     assert parse_config("route 52\n") is None
     assert parse_config("") is None
+
+
+def test_route_match_is_exact_or_one_letter_for_any_number():
+    samples = (
+        ("11", "11", True),
+        ("11", "11A", True),
+        ("11", "11B", True),
+        ("11", "11C", True),
+        ("11", "111", False),
+        ("11", "11AB", False),
+        ("11", "11a", False),
+        ("28", "28", True),
+        ("28", "28A", True),
+        ("28", "281", False),
+        ("28", "128", False),
+        ("501", "501", True),
+        ("501", "501C", True),
+        ("501", "5011", False),
+        ("7", "7B", True),
+        ("7", "70", False),
+        ("7", "71", False),
+    )
+    for configured, feed_id, expected in samples:
+        assert route_matches(configured, feed_id) is expected
+
+
+def test_letter_suffix_arrivals_collect_under_the_configured_number():
+    now = datetime(2026, 11, 14, 9, 0, tzinfo=TORONTO)
+    first = int((now + timedelta(minutes=8)).timestamp())
+    second = int((now + timedelta(minutes=21)).timestamp())
+    later = int((now + timedelta(minutes=30)).timestamp())
+    updates = [
+        ("11A", [("100", first)]),
+        ("11B", [("100", second)]),
+        ("111", [("100", later)]),
+        ("28", [("100", first)]),
+        ("281", [("100", later)]),
+    ]
+    config = parse_config("stop 100\nroute 11\nroute 28\n")
+    board = board_routes(
+        config,
+        updates,
+        now,
+        serving={"11A", "11B", "111", "28", "281"},
+    )
+    assert [item.route_id for item in board] == ["11", "28"]
+    assert [format_arrival(item) for item in board[0].arrivals] == ["9:08 am", "9:21 am"]
+    assert [format_arrival(item) for item in board[1].arrivals] == ["9:08 am"]
 
 
 def test_board_keeps_the_next_two_future_arrivals():
