@@ -157,6 +157,7 @@ def test_failed_fetch_reuses_todays_saved_reminder(tmp_path):
 
 
 def test_empty_today_shows_tomorrows_all_day_event():
+    """An empty today lists tomorrow's all-day event and its timed events on one line."""
     ics = """BEGIN:VCALENDAR
 BEGIN:VEVENT
 DTSTART;VALUE=DATE:20261114
@@ -176,6 +177,7 @@ END:VCALENDAR
 
 
 def test_empty_today_shows_tomorrows_first_timed_event():
+    """An empty today lists every tomorrow event, earliest first, not only the first."""
     ics = """BEGIN:VCALENDAR
 BEGIN:VEVENT
 DTSTART;TZID=America/Toronto:20261114T150000

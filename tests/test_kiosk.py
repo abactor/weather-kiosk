@@ -119,6 +119,7 @@ def test_four_pm_includes_the_current_hour(records):
 
 
 def test_seven_pm_drops_six(records):
+    """At 7 pm, 6 pm has left the window. The next morning still starts at 6 am."""
     now = _clock("2026-11-13T19:00:00-05:00")
     slots = select_slots(now, records)
     assert forecast_day(now).isoformat() == "2026-11-13"
@@ -314,6 +315,7 @@ def test_overnight_line_has_a_gap(records):
 
 
 def test_full_forecast_starts_now_and_can_return_to_present(records):
+    """The window starts at the current hour. A swipe jumps to the end or back to now, and a side tap moves two hours."""
     now = _clock("2026-11-13T10:30:00-05:00")
     slots = select_slots(now, records, count=None)
     hours = _hours(slots)
@@ -567,6 +569,7 @@ def test_blank_condition_draws_no_icon():
 
 
 def test_date_line_is_the_leftmost_day_only():
+    """The heading starts as the leftmost day. Later days stay in the page so a swipe can show them."""
     from datetime import datetime
     from types import SimpleNamespace
     from weather_kiosk.select import TORONTO, ForecastSlot

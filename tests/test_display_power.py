@@ -1,4 +1,4 @@
-"""Display idle dim, shutoff, tap to wake, and a centre tap that dims."""
+"""Idle dim, shutoff, tap to wake, a centre tap that dims, and a swipe that does not."""
 
 from __future__ import annotations
 
@@ -130,6 +130,7 @@ _TURNS_OFF = {"first": "dim", "second": "off", "level": "off", "consumed": True}
 
 
 def test_page_dims_after_five_minutes_then_turns_off():
+    """Idle dim and shutoff, plus a centre tap. A move past the threshold is a swipe and does not dim."""
     page = render_page(date(2026, 11, 14), [])
     assert "html.power-dim::before" in page
     assert "html.power-off::before" in page
