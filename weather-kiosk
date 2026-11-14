@@ -1,0 +1,10 @@
+#!/bin/sh
+# Run on the Raspberry Pi with the image's Python, not a 3.9 install.
+# The program uses only the standard library, so a virtualenv is unnecessary.
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+cd "$ROOT"
+if [ -x /usr/bin/python3 ]; then
+  exec /usr/bin/python3 -m weather_kiosk "$@"
+fi
+exec python3 -m weather_kiosk "$@"
