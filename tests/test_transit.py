@@ -150,7 +150,11 @@ def test_badge_shows_the_feed_id_of_the_soonest_trip():
     assert variant[0].route_id == "11A"
     assert [format_arrival(item) for item in variant[0].arrivals] == ["9:08 am", "9:21 am"]
     page = render_page(now.date(), [], [], "", variant)
-    assert 'class="badge">11A<' in page
+    assert 'class="badge long">11A<' in page
+    assert 'class="badge">11<' not in page
+    assert ".badge {\n  min-width: 40px;" in page
+    assert "font-size: 18px;\n  font-weight: 700;\n  line-height: 22px;\n  color: #121820;\n  background: #ff5a36;" in page
+    assert ".badge.long {\n  font-size: 17px;\n}" in page
     assert 'class="later">9:21 am<' in page
     assert "111" not in page
 
@@ -163,6 +167,7 @@ def test_badge_shows_the_feed_id_of_the_soonest_trip():
     assert base[0].route_id == "11"
     base_page = render_page(now.date(), [], [], "", base)
     assert 'class="badge">11<' in base_page
+    assert 'class="badge long">' not in base_page
     assert 'class="badge">11A<' not in base_page
     assert 'class="later">9:21 am<' in base_page
     assert "111" not in base_page
@@ -388,6 +393,8 @@ def test_panel_draws_the_board_and_omits_an_empty_corner():
     page = render_page(datetime(2026, 11, 14, tzinfo=TORONTO).date(), [], [], "", board)
     assert 'class="buses"' in page
     assert 'class="badge">28<' in page
+    assert 'class="badge">11<' in page
+    assert 'class="badge long">501<' in page
     assert 'class="next">9:08 am<' in page
     assert 'class="later">9:21 am<' in page
     assert 'class="note">no bus<' in page
