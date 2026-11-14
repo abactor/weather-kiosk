@@ -118,7 +118,7 @@ def parse_config(text: str) -> Optional[TransitConfig]:
                 groups.append(current)
         elif key == "route" and current is not None:
             for token in value.split(","):
-                route = token.strip()
+                route = token.strip().upper()
                 if route and not any(ch.isspace() for ch in route) and route not in current[1]:
                     current[1].append(route)
     stops = tuple((stop_id, tuple(routes)) for stop_id, routes in groups if routes)

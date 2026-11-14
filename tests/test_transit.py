@@ -174,6 +174,23 @@ def test_badge_shows_the_feed_id_of_the_soonest_trip():
 
 
 
+def test_lower_case_route_ids_match_upper_case_feed_ids():
+    config = parse_config("stop 100\nroute 11a, 28b\nroute 11A\n")
+    assert config is not None
+    assert config.routes == ("11A", "28B")
+    now = datetime(2026, 11, 14, 9, 0, tzinfo=TORONTO)
+    soon = int((now + timedelta(minutes=8)).timestamp())
+    board = board_routes(
+        config,
+        [("11A", [("100", soon)]), ("28B", [("100", soon)])],
+        now,
+        serving={"11A", "28B"},
+    )
+    assert [item.route_id for item in board] == ["11A", "28B"]
+    assert [format_arrival(item) for item in board[0].arrivals] == ["9:08 am"]
+    assert [format_arrival(item) for item in board[1].arrivals] == ["9:08 am"]
+
+
 def test_comma_list_keeps_only_the_named_variants():
     config = parse_config("stop 100\nroute 11A, 11B\nroute 11A,11C\n")
     assert config is not None
